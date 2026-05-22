@@ -3,8 +3,98 @@ document.addEventListener("DOMContentLoaded", () => {
   const activitySelect = document.getElementById("activity");
   const signupForm = document.getElementById("signup-form");
   const messageDiv = document.getElementById("message");
+  const signupContainer = document.getElementById("signup-container");
+  const authBtn = document.getElementById("auth-btn");
+  const loggedInUser = document.getElementById("logged-in-user");
+  const loginModal = document.getElementById("login-modal");
+  const loginForm = document.getElementById("login-form");
+  const cancelLogin = document.getElementById("cancel-login");
+  const loginError = document.getElementById("login-error");
 
-  // Function to fetch activities from API
+  // --- Auth helpers ---
+  function getToken() {
+    return sessionStorage.getItem("authToken");
+  }
+
+  function getUsername() {
+    return sessionStorage.getItem("authUsername");
+  }
+
+  function isLoggedIn() {
+    return !!getToken();
+  }
+
+  function authHeaders() {
+    const token = getToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
+
+  function updateAuthUI() {
+    if (isLoggedIn()) {
+      authBtn.textContent = "🔓 Logout";
+      loggedInUser.textContent = `Logged in as ${getUsername()}`;
+      loggedInUser.classList.remove("hidden");
+      signupContainer.classList.remove("hidden");
+    } else {
+      authBtn.textContent = "👤 Login";
+      loggedInUser.classList.add("hidden");
+      signupContainer.classList.add("hidden");
+    }
+    // Re-render activities so delete buttons show/hide correctly
+    fetchActivities();
+  }
+
+  // --- Login / Logout ---
+  authBtn.addEventListener("click", () => {
+    if (isLoggedIn()) {
+      fetch("/logout", { method: "POST", headers: authHeaders() })
+        .finally(() => {
+          sessionStorage.removeItem("authToken");
+          sessionStorage.removeItem("authUsername");
+          updateAuthUI();
+        });
+    } else {
+      loginModal.classList.remove("hidden");
+      loginForm.reset();
+      loginError.classList.add("hidden");
+    }
+  });
+
+  cancelLogin.addEventListener("click", () => {
+    loginModal.classList.add("hidden");
+  });
+
+  loginForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const username = document.getElementById("login-username").value;
+    const password = document.getElementById("login-password").value;
+    try {
+      const response = await fetch(
+        `/login?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`,
+        { method: "POST" }
+      );
+      const result = await response.json();
+      if (response.ok) {
+        sessionStorage.setItem("authToken", result.token);
+        sessionStorage.setItem("authUsername", result.username);
+        loginModal.classList.add("hidden");
+        updateAuthUI();
+      } else {
+        loginError.textContent = result.detail || "Login failed";
+        loginError.classList.remove("hidden");
+      }
+    } catch {
+      loginError.textContent = "Login failed. Please try again.";
+      loginError.classList.remove("hidden");
+    }
+  });
+
+  // Close modal when clicking outside
+  loginModal.addEventListener("click", (e) => {
+    if (e.target === loginModal) loginModal.classList.add("hidden");
+  });
+
+  // --- Activities ---
   async function fetchActivities() {
     try {
       const response = await fetch("/activities");
@@ -21,7 +111,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const spotsLeft =
           details.max_participants - details.participants.length;
 
-        // Create participants HTML with delete icons instead of bullet points
+        // Create participants HTML — delete buttons only shown to logged-in teachers
         const participantsHTML =
           details.participants.length > 0
             ? `<div class="participants-section">
@@ -30,7 +120,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 ${details.participants
                   .map(
                     (email) =>
-                      `<li><span class="participant-email">${email}</span><button class="delete-btn" data-activity="${name}" data-email="${email}">❌</button></li>`
+                      `<li><span class="participant-email">${email}</span>${
+                        isLoggedIn()
+                          ? `<button class="delete-btn" data-activity="${name}" data-email="${email}">❌</button>`
+                          : ""
+                      }</li>`
                   )
                   .join("")}
               </ul>
@@ -80,6 +174,7 @@ document.addEventListener("DOMContentLoaded", () => {
         )}/unregister?email=${encodeURIComponent(email)}`,
         {
           method: "DELETE",
+          headers: authHeaders(),
         }
       );
 
@@ -124,6 +219,7 @@ document.addEventListener("DOMContentLoaded", () => {
         )}/signup?email=${encodeURIComponent(email)}`,
         {
           method: "POST",
+          headers: authHeaders(),
         }
       );
 
@@ -155,6 +251,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Initialize app
+  // Initialize app — check session and render
+  if (isLoggedIn()) {
+    signupContainer.classList.remove("hidden");
+    loggedInUser.textContent = `Logged in as ${getUsername()}`;
+    loggedInUser.classList.remove("hidden");
+    authBtn.textContent = "🔓 Logout";
+  }
   fetchActivities();
 });
