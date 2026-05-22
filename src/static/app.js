@@ -29,6 +29,15 @@ document.addEventListener("DOMContentLoaded", () => {
     return token ? { Authorization: `Bearer ${token}` } : {};
   }
 
+  function showMessage(type, text) {
+    messageDiv.textContent = text;
+    messageDiv.className = type;
+    messageDiv.classList.remove("hidden");
+    setTimeout(() => {
+      messageDiv.classList.add("hidden");
+    }, 5000);
+  }
+
   function updateAuthUI() {
     if (isLoggedIn()) {
       authBtn.textContent = "🔓 Logout";
@@ -69,10 +78,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const username = document.getElementById("login-username").value;
     const password = document.getElementById("login-password").value;
     try {
-      const response = await fetch(
-        `/login?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`,
-        { method: "POST" }
-      );
+      const response = await fetch("/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
       const result = await response.json();
       if (response.ok) {
         sessionStorage.setItem("authToken", result.token);
@@ -102,6 +112,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Clear loading message
       activitiesList.innerHTML = "";
+      activitySelect.innerHTML = '<option value="">-- Select an activity --</option>';
 
       // Populate activities list
       Object.entries(activities).forEach(([name, details]) => {
@@ -111,35 +122,72 @@ document.addEventListener("DOMContentLoaded", () => {
         const spotsLeft =
           details.max_participants - details.participants.length;
 
-        // Create participants HTML — delete buttons only shown to logged-in teachers
-        const participantsHTML =
-          details.participants.length > 0
-            ? `<div class="participants-section">
-              <h5>Participants:</h5>
-              <ul class="participants-list">
-                ${details.participants
-                  .map(
-                    (email) =>
-                      `<li><span class="participant-email">${email}</span>${
-                        isLoggedIn()
-                          ? `<button class="delete-btn" data-activity="${name}" data-email="${email}">❌</button>`
-                          : ""
-                      }</li>`
-                  )
-                  .join("")}
-              </ul>
-            </div>`
-            : `<p><em>No participants yet</em></p>`;
+        const title = document.createElement("h4");
+        title.textContent = name;
+        activityCard.appendChild(title);
 
-        activityCard.innerHTML = `
-          <h4>${name}</h4>
-          <p>${details.description}</p>
-          <p><strong>Schedule:</strong> ${details.schedule}</p>
-          <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
-          <div class="participants-container">
-            ${participantsHTML}
-          </div>
-        `;
+        const description = document.createElement("p");
+        description.textContent = details.description;
+        activityCard.appendChild(description);
+
+        const schedule = document.createElement("p");
+        const scheduleLabel = document.createElement("strong");
+        scheduleLabel.textContent = "Schedule:";
+        schedule.appendChild(scheduleLabel);
+        schedule.append(` ${details.schedule}`);
+        activityCard.appendChild(schedule);
+
+        const availability = document.createElement("p");
+        const availabilityLabel = document.createElement("strong");
+        availabilityLabel.textContent = "Availability:";
+        availability.appendChild(availabilityLabel);
+        availability.append(` ${spotsLeft} spots left`);
+        activityCard.appendChild(availability);
+
+        const participantsContainer = document.createElement("div");
+        participantsContainer.className = "participants-container";
+
+        if (details.participants.length > 0) {
+          const participantsSection = document.createElement("div");
+          participantsSection.className = "participants-section";
+
+          const heading = document.createElement("h5");
+          heading.textContent = "Participants:";
+          participantsSection.appendChild(heading);
+
+          const list = document.createElement("ul");
+          list.className = "participants-list";
+
+          details.participants.forEach((email) => {
+            const listItem = document.createElement("li");
+            const emailSpan = document.createElement("span");
+            emailSpan.className = "participant-email";
+            emailSpan.textContent = email;
+            listItem.appendChild(emailSpan);
+
+            if (isLoggedIn()) {
+              const deleteBtn = document.createElement("button");
+              deleteBtn.className = "delete-btn";
+              deleteBtn.setAttribute("data-activity", name);
+              deleteBtn.setAttribute("data-email", email);
+              deleteBtn.textContent = "❌";
+              listItem.appendChild(deleteBtn);
+            }
+
+            list.appendChild(listItem);
+          });
+
+          participantsSection.appendChild(list);
+          participantsContainer.appendChild(participantsSection);
+        } else {
+          const noParticipants = document.createElement("p");
+          const emphasis = document.createElement("em");
+          emphasis.textContent = "No participants yet";
+          noParticipants.appendChild(emphasis);
+          participantsContainer.appendChild(noParticipants);
+        }
+
+        activityCard.appendChild(participantsContainer);
 
         activitiesList.appendChild(activityCard);
 
@@ -181,26 +229,15 @@ document.addEventListener("DOMContentLoaded", () => {
       const result = await response.json();
 
       if (response.ok) {
-        messageDiv.textContent = result.message;
-        messageDiv.className = "success";
+        showMessage("success", result.message);
 
         // Refresh activities list to show updated participants
         fetchActivities();
       } else {
-        messageDiv.textContent = result.detail || "An error occurred";
-        messageDiv.className = "error";
+        showMessage("error", result.detail || "An error occurred");
       }
-
-      messageDiv.classList.remove("hidden");
-
-      // Hide message after 5 seconds
-      setTimeout(() => {
-        messageDiv.classList.add("hidden");
-      }, 5000);
     } catch (error) {
-      messageDiv.textContent = "Failed to unregister. Please try again.";
-      messageDiv.className = "error";
-      messageDiv.classList.remove("hidden");
+      showMessage("error", "Failed to unregister. Please try again.");
       console.error("Error unregistering:", error);
     }
   }
@@ -226,27 +263,16 @@ document.addEventListener("DOMContentLoaded", () => {
       const result = await response.json();
 
       if (response.ok) {
-        messageDiv.textContent = result.message;
-        messageDiv.className = "success";
+        showMessage("success", result.message);
         signupForm.reset();
 
         // Refresh activities list to show updated participants
         fetchActivities();
       } else {
-        messageDiv.textContent = result.detail || "An error occurred";
-        messageDiv.className = "error";
+        showMessage("error", result.detail || "An error occurred");
       }
-
-      messageDiv.classList.remove("hidden");
-
-      // Hide message after 5 seconds
-      setTimeout(() => {
-        messageDiv.classList.add("hidden");
-      }, 5000);
     } catch (error) {
-      messageDiv.textContent = "Failed to sign up. Please try again.";
-      messageDiv.className = "error";
-      messageDiv.classList.remove("hidden");
+      showMessage("error", "Failed to sign up. Please try again.");
       console.error("Error signing up:", error);
     }
   });

@@ -8,6 +8,7 @@ for extracurricular activities at Mergington High School.
 from fastapi import FastAPI, HTTPException, Header
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
+from pydantic import BaseModel
 import os
 import json
 import hashlib
@@ -18,23 +19,31 @@ from typing import Optional
 app = FastAPI(title="Mergington High School API",
               description="API for viewing and signing up for extracurricular activities")
 
+BEARER_PREFIX = "Bearer "
+HASH_ITERATIONS = 100000
+
 # Mount the static files directory
 current_dir = Path(__file__).parent
 
 # Load teacher credentials from JSON file
 teachers_file = current_dir / "teachers.json"
-with open(teachers_file) as f:
+with open(teachers_file, encoding="utf-8") as f:
     teachers = {t["username"]: t for t in json.load(f)}
 
 # In-memory session store: token -> username
 active_sessions: dict[str, str] = {}
 
 
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
 def verify_token(authorization: Optional[str]) -> str:
     """Validate Bearer token and return username, or raise 401."""
-    if not authorization or not authorization.startswith("Bearer "):
+    if not authorization or not authorization.startswith(BEARER_PREFIX):
         raise HTTPException(status_code=401, detail="Authentication required")
-    token = authorization[len("Bearer "):]
+    token = authorization.removeprefix(BEARER_PREFIX).strip()
     if token not in active_sessions:
         raise HTTPException(status_code=401, detail="Invalid or expired session")
     return active_sessions[token]
@@ -108,26 +117,26 @@ def root():
 
 
 @app.post("/login")
-def login(username: str, password: str):
+def login(request: LoginRequest):
     """Authenticate a teacher and return a session token."""
-    teacher = teachers.get(username)
+    teacher = teachers.get(request.username)
     if not teacher:
         raise HTTPException(status_code=401, detail="Invalid username or password")
     expected = hashlib.pbkdf2_hmac(
-        "sha256", password.encode(), teacher["salt"].encode(), 100000
+        "sha256", request.password.encode(), teacher["salt"].encode(), HASH_ITERATIONS
     ).hex()
     if not secrets.compare_digest(expected, teacher["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid username or password")
     token = secrets.token_urlsafe(32)
-    active_sessions[token] = username
-    return {"token": token, "username": username}
+    active_sessions[token] = request.username
+    return {"token": token, "username": request.username}
 
 
 @app.post("/logout")
 def logout(authorization: Optional[str] = Header(default=None)):
     """Invalidate the current session token."""
-    if authorization and authorization.startswith("Bearer "):
-        token = authorization[len("Bearer "):]
+    if authorization and authorization.startswith(BEARER_PREFIX):
+        token = authorization.removeprefix(BEARER_PREFIX).strip()
         active_sessions.pop(token, None)
     return {"message": "Logged out"}
 
@@ -135,8 +144,8 @@ def logout(authorization: Optional[str] = Header(default=None)):
 @app.get("/auth/status")
 def auth_status(authorization: Optional[str] = Header(default=None)):
     """Check whether the current token belongs to a valid session."""
-    if authorization and authorization.startswith("Bearer "):
-        token = authorization[len("Bearer "):]
+    if authorization and authorization.startswith(BEARER_PREFIX):
+        token = authorization.removeprefix(BEARER_PREFIX).strip()
         if token in active_sessions:
             return {"authenticated": True, "username": active_sessions[token]}
     return {"authenticated": False}
