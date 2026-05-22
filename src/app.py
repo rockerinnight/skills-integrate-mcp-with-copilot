@@ -14,7 +14,7 @@ import json
 import hashlib
 import secrets
 from pathlib import Path
-from typing import Optional
+from typing import Annotated, Optional
 
 app = FastAPI(title="Mergington High School API",
               description="API for viewing and signing up for extracurricular activities")
@@ -32,6 +32,7 @@ with open(teachers_file, encoding="utf-8") as f:
 
 # In-memory session store: token -> username
 active_sessions: dict[str, str] = {}
+AuthorizationHeader = Annotated[Optional[str], Header()]
 
 
 class LoginRequest(BaseModel):
@@ -116,7 +117,10 @@ def root():
     return RedirectResponse(url="/static/index.html")
 
 
-@app.post("/login")
+@app.post(
+    "/login",
+    responses={401: {"description": "Invalid username or password"}},
+)
 def login(request: LoginRequest):
     """Authenticate a teacher and return a session token."""
     teacher = teachers.get(request.username)
@@ -133,7 +137,7 @@ def login(request: LoginRequest):
 
 
 @app.post("/logout")
-def logout(authorization: Optional[str] = Header(default=None)):
+def logout(authorization: AuthorizationHeader = None):
     """Invalidate the current session token."""
     if authorization and authorization.startswith(BEARER_PREFIX):
         token = authorization.removeprefix(BEARER_PREFIX).strip()
@@ -142,7 +146,7 @@ def logout(authorization: Optional[str] = Header(default=None)):
 
 
 @app.get("/auth/status")
-def auth_status(authorization: Optional[str] = Header(default=None)):
+def auth_status(authorization: AuthorizationHeader = None):
     """Check whether the current token belongs to a valid session."""
     if authorization and authorization.startswith(BEARER_PREFIX):
         token = authorization.removeprefix(BEARER_PREFIX).strip()
@@ -156,8 +160,11 @@ def get_activities():
     return activities
 
 
-@app.post("/activities/{activity_name}/signup")
-def signup_for_activity(activity_name: str, email: str, authorization: Optional[str] = Header(default=None)):
+@app.post(
+    "/activities/{activity_name}/signup",
+    responses={401: {"description": "Authentication required"}},
+)
+def signup_for_activity(activity_name: str, email: str, authorization: AuthorizationHeader = None):
     """Sign up a student for an activity (requires teacher login)"""
     verify_token(authorization)
     # Validate activity exists
@@ -179,8 +186,11 @@ def signup_for_activity(activity_name: str, email: str, authorization: Optional[
     return {"message": f"Signed up {email} for {activity_name}"}
 
 
-@app.delete("/activities/{activity_name}/unregister")
-def unregister_from_activity(activity_name: str, email: str, authorization: Optional[str] = Header(default=None)):
+@app.delete(
+    "/activities/{activity_name}/unregister",
+    responses={401: {"description": "Authentication required"}},
+)
+def unregister_from_activity(activity_name: str, email: str, authorization: AuthorizationHeader = None):
     """Unregister a student from an activity (requires teacher login)"""
     verify_token(authorization)
     # Validate activity exists

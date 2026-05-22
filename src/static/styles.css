@@ -22,6 +22,7 @@ header {
   background-color: #1a237e;
   color: white;
   border-radius: 5px;
+  position: relative;
 }
 
 header h1 {
@@ -207,10 +208,6 @@ footer {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-
-header {
-  position: relative;
 }
 
 #logged-in-user {

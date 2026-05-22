@@ -1,3 +1,11 @@
+function getToken() {
+  return sessionStorage.getItem("authToken");
+}
+
+function getUsername() {
+  return sessionStorage.getItem("authUsername");
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   const activitiesList = document.getElementById("activities-list");
   const activitySelect = document.getElementById("activity");
@@ -12,14 +20,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const loginError = document.getElementById("login-error");
 
   // --- Auth helpers ---
-  function getToken() {
-    return sessionStorage.getItem("authToken");
-  }
-
-  function getUsername() {
-    return sessionStorage.getItem("authUsername");
-  }
-
   function isLoggedIn() {
     return !!getToken();
   }
@@ -168,8 +168,8 @@ document.addEventListener("DOMContentLoaded", () => {
             if (isLoggedIn()) {
               const deleteBtn = document.createElement("button");
               deleteBtn.className = "delete-btn";
-              deleteBtn.setAttribute("data-activity", name);
-              deleteBtn.setAttribute("data-email", email);
+              deleteBtn.dataset.activity = name;
+              deleteBtn.dataset.email = email;
               deleteBtn.textContent = "❌";
               listItem.appendChild(deleteBtn);
             }
@@ -212,8 +212,8 @@ document.addEventListener("DOMContentLoaded", () => {
   // Handle unregister functionality
   async function handleUnregister(event) {
     const button = event.target;
-    const activity = button.getAttribute("data-activity");
-    const email = button.getAttribute("data-email");
+    const activity = button.dataset.activity;
+    const email = button.dataset.email;
 
     try {
       const response = await fetch(
