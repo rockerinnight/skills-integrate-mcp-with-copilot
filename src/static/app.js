@@ -6,6 +6,15 @@ function getUsername() {
   return sessionStorage.getItem("authUsername");
 }
 
+function isLoggedIn() {
+  return !!getToken();
+}
+
+function authHeaders() {
+  const token = getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   const activitiesList = document.getElementById("activities-list");
   const activitySelect = document.getElementById("activity");
@@ -20,15 +29,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const loginError = document.getElementById("login-error");
 
   // --- Auth helpers ---
-  function isLoggedIn() {
-    return !!getToken();
-  }
-
-  function authHeaders() {
-    const token = getToken();
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  }
-
   function showMessage(type, text) {
     messageDiv.textContent = text;
     messageDiv.className = type;
