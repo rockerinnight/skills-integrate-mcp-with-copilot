@@ -1,0 +1,12 @@
+[
+  {
+    "username": "teacher1",
+    "salt": "1a2602c3a641ca7ab529b701603b1c6e",
+    "password_hash": "0958e7795fab5bf21fd204062c91a0cf9c1d40cc450513e4ad3f2e9c606ee8a0"
+  },
+  {
+    "username": "admin",
+    "salt": "1cc6dd87f165cc1d9915e15b5f188ac7",
+    "password_hash": "a5dcc412ecafe9cb817c56baf8e2debf603d1ca2ca7d5e8f7390db453d1ddf95"
+  }
+]
